@@ -1,0 +1,21 @@
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: String | Program: Palindrome Check | Inputs: abc | Result:  | Status: 
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=%!f(MISSING) | Result: 100.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 2000.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=5.00, height=%!f(MISSING) | Result: 78.54 | Status: Success
+Category: String | Program: Reverse String | Inputs: abc | Result: cba | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: String | Program: Reverse String | Inputs: kiran | Result: narik | Status: Success
+Category: String | Program: Count Vowels | Inputs: harshu | Result: Vowel Count: 2 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=15.00, height=%!f(MISSING) | Result: 706.86 | Status: Success
+Category: Math | Program: Volume of Rectangle | Inputs: base=22.00, height=34.00%!(EXTRA float64=12) | Result: 8976.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=14.00, height=13.00 | Result: 182.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=25.00, height=%!f(MISSING) | Result: 625.00 | Status: Success
+Category: Math | Program: Volume of Circle | Inputs: base=44.00, height=34.00 | Result: 206792.19 | Status: Success
+Category: String | Program: Count Vowels | Inputs: animals | Result: Vowel Count: 3 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=1.00, height=10.00 | Result: 5.00 | Status: Success
+Category: Math | Program: Area of Triangle | Inputs: base=10.00, height=20.00 | Result: 100.00 | Status: Success
+Category: String | Program: Palindrome Check | Inputs: darshan | Result: Not a palindrome | Status: Failed
