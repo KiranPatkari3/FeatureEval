@@ -10,16 +10,18 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/rs/cors"
+	// Import your features package
+	// Import your handlers package
 )
 
 var db *sql.DB
 
 func main() {
-	// 🔄 Load the correct environment file based on GO_ENV
+	// Load the correct environment file based on GO_ENV
 	env := os.Getenv("GO_ENV")
-	envFile := ".env" // Default to .env
+	envFile := "env/.env" // Default to .env
 	if env == "production" {
-		envFile = ".env.production"
+		envFile = "env/.env.production"
 	}
 
 	err := godotenv.Load(envFile)
