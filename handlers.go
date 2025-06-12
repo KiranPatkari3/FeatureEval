@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Knetic/govaluate"
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 type Credentials struct {
@@ -44,38 +45,103 @@ type EvalResponse struct {
 	Result float64 `json:"result"`
 }
 
-func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	var creds Credentials
-	json.NewDecoder(r.Body).Decode(&creds)
+type APIResponse struct {
+	Status       bool        `json:"status"`
+	Message      string      `json:"message"`
+	Data         interface{} `json:"data,omitempty"`
+	TotalRecords int         `json:"total_records,omitempty"`
+	Page         int         `json:"page,omitempty"`
+	Size         int         `json:"size,omitempty"`
+}
 
-	_, err := db.Exec("INSERT INTO users (username, password) VALUES (?, ?)", creds.Username, creds.Password)
-	if err != nil {
-		http.Error(w, "User already exists or error occurred", http.StatusBadRequest)
+func respondJSON(w http.ResponseWriter, status bool, message string, data interface{}, totalRecords, page, size int) {
+	w.Header().Set("Content-Type", "application/json")
+	response := APIResponse{
+		Status:       status,
+		Message:      message,
+		Data:         data,
+		TotalRecords: totalRecords,
+		Page:         page,
+		Size:         size,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var creds Credentials
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  false,
+			"message": "Invalid request body",
+		})
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprint(w, "Signup successful")
+
+	_, err := db.Exec("INSERT INTO users (username, password) VALUES ($1, $2)", creds.Username, creds.Password)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  false,
+			"message": "User already exists or error occurred",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  true,
+		"message": "Signup successful",
+		"data": map[string]string{
+			"username": creds.Username,
+		},
+	})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var creds Credentials
-	json.NewDecoder(r.Body).Decode(&creds)
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  false,
+			"message": "Invalid request body",
+		})
+		return
+	}
 
-	row := db.QueryRow("SELECT id FROM users WHERE username=? AND password=?", creds.Username, creds.Password)
+	row := db.QueryRow("SELECT id FROM users WHERE username=$1 AND password=$2", creds.Username, creds.Password)
 	var id int
 	err := row.Scan(&id)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  false,
+			"message": "Invalid credentials",
+		})
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, "Login successful")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  true,
+		"message": "Login successful",
+		"data": map[string]interface{}{
+			"user_id":  id,
+			"username": creds.Username,
+		},
+	})
 }
 
 func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query("SELECT id, name FROM features")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 10
+	}
+	offset := (page - 1) * size
+
+	rows, err := db.Query("SELECT id, name FROM features LIMIT $1 OFFSET $2", size, offset)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondJSON(w, false, "Database error", nil, 0, page, size)
 		return
 	}
 	defer rows.Close()
@@ -86,14 +152,19 @@ func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&f.ID, &f.Name)
 		features = append(features, f)
 	}
-	json.NewEncoder(w).Encode(features)
+
+	row := db.QueryRow("SELECT COUNT(*) FROM features")
+	var total int
+	row.Scan(&total)
+
+	respondJSON(w, true, "Features fetched", features, total, page, size)
 }
 
 func OperationsHandler(w http.ResponseWriter, r *http.Request) {
 	featureID := r.URL.Query().Get("feature_id")
-	rows, err := db.Query("SELECT id, name FROM operations WHERE f_id = ?", featureID)
+	rows, err := db.Query("SELECT id, name FROM operations WHERE f_id = $1", featureID)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondJSON(w, false, "Database error", nil, 0, 0, 0)
 		return
 	}
 	defer rows.Close()
@@ -104,14 +175,14 @@ func OperationsHandler(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&o.ID, &o.Name)
 		ops = append(ops, o)
 	}
-	json.NewEncoder(w).Encode(ops)
+	respondJSON(w, true, "Operations fetched", ops, len(ops), 1, len(ops))
 }
 
 func VariationsHandler(w http.ResponseWriter, r *http.Request) {
 	opID := r.URL.Query().Get("operation_id")
-	rows, err := db.Query("SELECT id, name, formula, params FROM variations WHERE o_id = ?", opID)
+	rows, err := db.Query("SELECT id, name, formula, params FROM variations WHERE o_id = $1", opID)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondJSON(w, false, "Database error", nil, 0, 0, 0)
 		return
 	}
 	defer rows.Close()
@@ -129,14 +200,14 @@ func VariationsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		variations = append(variations, v)
 	}
-	json.NewEncoder(w).Encode(variations)
+	respondJSON(w, true, "Variations fetched", variations, len(variations), 1, len(variations))
 }
 
 func EvaluateHandler(w http.ResponseWriter, r *http.Request) {
 	var req EvalRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+		respondJSON(w, false, "Invalid input", nil, 0, 0, 0)
 		return
 	}
 
@@ -145,16 +216,20 @@ func EvaluateHandler(w http.ResponseWriter, r *http.Request) {
 	var variationName, programName string
 	var opID int
 
-	row := db.QueryRow("SELECT v.formula, v.params, v.name, o.name, o.id FROM variations v JOIN operations o ON v.o_id = o.id WHERE v.id = ?", req.VariationID)
+	row := db.QueryRow(`
+		SELECT v.formula, v.params, v.name, o.name, o.id
+		FROM variations v
+		JOIN operations o ON v.o_id = o.id
+		WHERE v.id = $1`, req.VariationID)
 	err = row.Scan(&formula, &paramsJSON, &variationName, &programName, &opID)
 	if err != nil {
-		http.Error(w, "Variation not found", http.StatusBadRequest)
+		respondJSON(w, false, "Variation not found", nil, 0, 0, 0)
 		return
 	}
 
 	expr, err := govaluate.NewEvaluableExpression(formula)
 	if err != nil {
-		http.Error(w, "Invalid formula", http.StatusInternalServerError)
+		respondJSON(w, false, "Invalid formula", nil, 0, 0, 0)
 		return
 	}
 
@@ -162,7 +237,7 @@ func EvaluateHandler(w http.ResponseWriter, r *http.Request) {
 	for k, v := range req.Inputs {
 		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			http.Error(w, "Invalid number input", http.StatusBadRequest)
+			respondJSON(w, false, "Invalid number input", nil, 0, 0, 0)
 			return
 		}
 		parameters[k] = val
@@ -170,19 +245,20 @@ func EvaluateHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, err := expr.Evaluate(parameters)
 	if err != nil {
-		http.Error(w, "Evaluation error", http.StatusInternalServerError)
+		respondJSON(w, false, "Evaluation error", nil, 0, 0, 0)
 		return
 	}
 
 	resultFloat, _ := strconv.ParseFloat(fmt.Sprintf("%v", result), 64)
-
 	inputsJSON, _ := json.Marshal(req.Inputs)
-	_, err = db.Exec(`INSERT INTO user_logs (category, program, inputs, result, status, variation_id, logged_at) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+
+	_, err = db.Exec(`
+		INSERT INTO user_logs (category, program, inputs, result, status, variation_id, logged_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		"Math/String", programName, string(inputsJSON), resultFloat, "Success", req.VariationID, time.Now())
 	if err != nil {
 		log.Println("Error logging:", err)
 	}
 
-	json.NewEncoder(w).Encode(EvalResponse{Status: "success", Result: resultFloat})
+	respondJSON(w, true, "Evaluation successful", EvalResponse{Status: "success", Result: resultFloat}, 1, 1, 1)
 }

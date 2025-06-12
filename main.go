@@ -5,32 +5,40 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/rs/cors"
 )
 
 var db *sql.DB
 
 func main() {
-	var err error
+	// Load environment variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("❌ Error loading .env file")
+	}
 
-	dsn := "root:admin@321@tcp(127.0.0.1:3306)/logs?parseTime=true&timeout=5s"
-	db, err = sql.Open("mysql", dsn)
+	// Read DB connection string from env variable
+	connStr := os.Getenv("DB_CONN")
+	if connStr == "" {
+		log.Fatal("❌ Environment variable DB_CONN is not set")
+	}
+
+	//  Connect to PostgreSQL
+	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("❌ Failed to open DB connection: %v", err)
 	}
 
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(10)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
 	if err = db.Ping(); err != nil {
 		log.Fatalf("❌ Failed to connect to DB: %v", err)
 	}
-	log.Println("✅ Connected to MySQL database.")
+	log.Println("✅ Connected to database.")
 
+	// ✅ HTTP handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/signup", SignupHandler)
 	mux.HandleFunc("/api/login", LoginHandler)
@@ -39,8 +47,10 @@ func main() {
 	mux.HandleFunc("/api/variations", VariationsHandler)
 	mux.HandleFunc("/api/evaluate", EvaluateHandler)
 
+	// ✅ Enable CORS
 	handler := cors.AllowAll().Handler(mux)
 
+	// ✅ Start the server
 	fmt.Println("🚀 Server running at http://localhost:8081")
-	log.Fatal(http.ListenAndServe(":8081", handler))
+	log.Fatal(http.ListenAndServe("0.0.0.0:8081", handler))
 }
