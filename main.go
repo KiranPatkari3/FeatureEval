@@ -15,19 +15,25 @@ import (
 var db *sql.DB
 
 func main() {
-	// Load environment variables from .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("❌ Error loading .env file")
+	// 🔄 Load the correct environment file based on GO_ENV
+	env := os.Getenv("GO_ENV")
+	envFile := ".env" // Default to .env
+	if env == "production" {
+		envFile = ".env.production"
 	}
 
-	// Read DB connection string from env variable
+	err := godotenv.Load(envFile)
+	if err != nil {
+		log.Fatalf("❌ Error loading %s file: %v", envFile, err)
+	}
+
+	// 🔐 Read DB connection string from env variable
 	connStr := os.Getenv("DB_CONN")
 	if connStr == "" {
 		log.Fatal("❌ Environment variable DB_CONN is not set")
 	}
 
-	//  Connect to PostgreSQL
+	// 🌐 Connect to PostgreSQL
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("❌ Failed to open DB connection: %v", err)
@@ -38,7 +44,7 @@ func main() {
 	}
 	log.Println("✅ Connected to database.")
 
-	// ✅ HTTP handlers
+	// 📡 HTTP Handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/signup", SignupHandler)
 	mux.HandleFunc("/api/login", LoginHandler)
@@ -50,7 +56,7 @@ func main() {
 	// ✅ Enable CORS
 	handler := cors.AllowAll().Handler(mux)
 
-	// ✅ Start the server
+	// 🚀 Start the server
 	fmt.Println("🚀 Server running at http://localhost:8081")
 	log.Fatal(http.ListenAndServe("0.0.0.0:8081", handler))
 }
